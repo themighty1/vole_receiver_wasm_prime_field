@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VOLE WASM Receiver (Bob)</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        #output { background: #0d0d0d; padding: 15px; border-radius: 5px; white-space: pre-wrap; height: 500px; overflow-y: auto; }
+        button { background: #0e639c; color: white; border: none; padding: 10px 20px; margin: 10px 5px; cursor: pointer; border-radius: 3px; }
+        button:hover { background: #1177bb; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        input { background: #3c3c3c; color: white; border: 1px solid #555; padding: 8px; margin: 5px; border-radius: 3px; }
+        h1 { color: #569cd6; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .loading { background: #4a4a2d; }
+        .ready { background: #2d4a2d; }
+        .running { background: #2d2d4a; }
+        .error { background: #4a2d2d; }
+        .success { background: #2d4a2d; }
+        .info { margin: 15px 0; padding: 10px; background: #2d2d2d; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>VOLE WASM Receiver (Bob)</h1>
+
+    <div id="status" class="status loading">Loading WASM module...</div>
+
+    <div class="info">
+        <strong>Setup:</strong><br>
+        1. Start native sender: <code>./native/build/vole_sender 12345</code><br>
+        2. Start WebSocket proxy: <code>node wasm/ws_proxy.js</code><br>
+        3. Click "Run VOLE" below
+    </div>
+
+    <div>
+        <label>Server (via proxy):</label>
+        <input type="text" id="serverIp" value="localhost" size="15">
+        <input type="text" id="serverPort" value="8080" size="6">
+        <button id="runBtn" onclick="runVOLE()" disabled>Run VOLE</button>
+        <button onclick="clearOutput()">Clear</button>
+    </div>
+
+    <h3>Output:</h3>
+    <div id="output"></div>
+
+    <script>
+        var Module = {
+            print: function(text) {
+                var output = document.getElementById('output');
+                output.textContent += text + '\n';
+                output.scrollTop = output.scrollHeight;
+            },
+            printErr: function(text) {
+                var output = document.getElementById('output');
+                output.textContent += '[ERR] ' + text + '\n';
+                output.scrollTop = output.scrollHeight;
+            },
+            onRuntimeInitialized: function() {
+                document.getElementById('status').textContent = 'WASM Ready - Start server and proxy, then click "Run VOLE"';
+                document.getElementById('status').className = 'status ready';
+                document.getElementById('runBtn').disabled = false;
+            }
+        };
+
+        function clearOutput() {
+            document.getElementById('output').textContent = '';
+        }
+
+        async function runVOLE() {
+            var serverIp = document.getElementById('serverIp').value;
+            var serverPort = parseInt(document.getElementById('serverPort').value);
+            var runBtn = document.getElementById('runBtn');
+
+            document.getElementById('status').textContent = 'Running VOLE protocol...';
+            document.getElementById('status').className = 'status running';
+            runBtn.disabled = true;
+
+            document.getElementById('output').textContent += '\n=== Starting VOLE with server at ' + serverIp + ':' + serverPort + ' ===\n\n';
+
+            try {
+                var result = await Module.ccall('vole_run', 'number', ['string', 'number'], [serverIp, serverPort], {async: true});
+                if (result === 0) {
+                    document.getElementById('status').textContent = 'VOLE completed successfully! All correlations verified.';
+                    document.getElementById('status').className = 'status success';
+                } else {
+                    document.getElementById('status').textContent = 'VOLE completed but verification failed (code: ' + result + ')';
+                    document.getElementById('status').className = 'status error';
+                }
+            } catch (e) {
+                document.getElementById('status').textContent = 'Error: ' + e.message;
+                document.getElementById('status').className = 'status error';
+                document.getElementById('output').textContent += 'Exception: ' + e.message + '\n';
+            }
+
+            runBtn.disabled = false;
+        }
+    </script>
+    <script src="build_wasm/vole_receiver.js"></script>
+</body>
+</html>

@@ -46,3 +46,15 @@ emp-ot/latticeInclude.h
 
 # Eigen source
 eigen/
+
+# Build directories
+native/build/
+wasm/build/
+wasm/build_*/
+
+# Node
+wasm/node_modules/
+wasm/package-lock.json
+
+# Emscripten SDK (auto-installed by build.sh)
+emsdk/

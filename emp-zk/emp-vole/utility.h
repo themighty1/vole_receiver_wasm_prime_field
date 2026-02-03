@@ -1,5 +1,41 @@
 #ifndef FP_UTILITY_H__
 #define FP_UTILITY_H__
+
+#ifdef EMP_PORTABLE
+// Portable mode - use shim instead of emp-tool
+#include "emp_tool_shim.h"
+
+using namespace emp;
+using namespace std;
+
+#define MERSENNE_PRIME_EXP 61
+#define FIELD_TYPE uint64_t
+const static __uint128_t p = 2305843009213693951;
+const static int r = 1;
+const static block prs = makeBlock(2305843009213693951ULL, 2305843009213693951ULL);
+
+// Portable mul64
+inline uint64_t mul64(uint64_t a, uint64_t b, uint64_t *c) {
+    __uint128_t r = (__uint128_t)a * b;
+    *c = r >> 64;
+    return (uint64_t)r;
+}
+
+inline uint64_t mod_pre(__uint128_t x) {
+    return (x & PR) + (x >> MERSENNE_PRIME_EXP);
+}
+
+// Note: mod, add_mod, mult_mod already defined in emp_tool_shim.h
+
+// Portable extract_fp
+inline void extract_fp(__uint128_t &x) {
+    x = mod((uint64_t)(x & 0xFFFFFFFFFFFFFFFFULL));
+}
+
+// Template functions already defined in emp_tool_shim.h
+
+#else
+// Original emp-tool mode with SSE intrinsics
 #include <emp-tool/emp-tool.h>
 using namespace emp;
 using namespace std;
@@ -19,7 +55,6 @@ inline uint64_t mul64(uint64_t a, uint64_t b, uint64_t *c) {
   return _mulx_u64((unsigned long long)a, (unsigned long long)b,
                    (unsigned long long *)c);
 }
-//
 #else
 inline uint64_t mul64(uint64_t a, uint64_t b, uint64_t *c) {
   __uint128_t aa = a;
@@ -78,7 +113,6 @@ inline void mult_mod_bch4(block *res, block *a, uint64_t *b) {
   for (int i = 0; i < 4; ++i)
     res[i] = pt[i];
 }
-
 #endif
 
 inline block vec_mod(block i) {
@@ -91,11 +125,8 @@ inline block mult_mod(block a, uint64_t b) {
   uint64_t L = _mm_extract_epi64(a, 0);
   block bs[2];
   uint64_t *is = (uint64_t *)(bs);
-  //	uint64_t h0, h1, l0, l1;
   is[1] = mul64(H, b, (uint64_t *)(is + 3));
   is[0] = mul64(L, b, (uint64_t *)(is + 2));
-  // block Hb = _mm_set_epi64((__m64)h1, (__m64)l1);
-  // block Lb = _mm_set_epi64((__m64)h0, (__m64)l0);
   block t1 = bs[0] & prs;
   block t2 = _mm_srli_epi64(bs[0], MERSENNE_PRIME_EXP) ^
              _mm_slli_epi64(bs[1], 64 - MERSENNE_PRIME_EXP);
@@ -206,20 +237,7 @@ T vector_inn_prdt_sum_red(const S *a, const T *b, int sz) {
     res = add_mod(res, mult_mod((T)a[i], b[i]));
   return res;
 }
-/*
-void feq_send(NetIO *io, void* in, int nbytes) {
-        Hash hash;
-        block h = hash.hash_for_block(in, nbytes);
-        io->send_data(&h, sizeof(block));
-}
 
-bool feq_recv(NetIO *io, void* in, int nbytes) {
-        Hash hash;
-        block h = hash.hash_for_block(in, nbytes);
-        block r;
-        io->recv_data(&r, sizeof(block));
-        if(!cmpBlock(&r, &h, 1)) return false;
-        else return true;
-}
-*/
-#endif
+#endif // EMP_PORTABLE
+
+#endif // FP_UTILITY_H__
